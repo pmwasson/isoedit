@@ -17,12 +17,14 @@ ISOHEIGHT = ISOWIDTH>>1
 ISOOFFSET = 4
 
 WIDTH = ISOWIDTH-2
+HEIGHT = 64-8
+
+CENTERX = (WIDTH>>1)-1
+CENTERY = (HEIGHT-ISOOFFSET-(ISOHEIGHT>>1))-1
 
 OFFSETX = 600
 OFFSETY = 5
 
-
-HEIGHT = 64-8
 PREVIEWX = 5
 PREVIEWY = OFFSETY
 PREVIEWSCALE = 2
@@ -64,6 +66,27 @@ class PixelCanvas:
    def flip(self):
       self.sarray = self.sarray[::-1,:]
  
+   def left(self):
+      temp = self.sarray[0,:]
+      self.sarray[:-1,:] = self.sarray[1:,:]
+      self.sarray[-1,:] = temp
+
+   def right(self):
+      temp = self.sarray[-1,:]
+      self.sarray[1:,:] = self.sarray[:-1,:]
+      self.sarray[0,:] = temp
+
+   def up(self):
+      temp = self.sarray[:,0]
+      self.sarray[:,:-1] = self.sarray[:,1:]
+      self.sarray[:,-1] = temp
+
+   def down(self):
+      temp = self.sarray[:,-1]
+      self.sarray[:,1:] = self.sarray[:,:-1]
+      self.sarray[:,0] = temp
+
+
    def get_preview(self):
       return self.sarray.make_surface()
 
@@ -84,16 +107,18 @@ class TileList:
    def __init__(self,path):
       self.path = path
       self.list = None
+      self.surfaces = None
 
    def read(self):
-      self.list = [f for f in os.listdir(self.path) if os.path.isfile(os.path.join(self.path,f)) and (f.find('.png') != -1)] 
+      self.list = [f for f in os.listdir(self.path) if os.path.isfile(os.path.join(self.path,f)) and (f.find('.png') != -1)]
+      self.surfaces = [pygame.image.load(os.path.join(self.path,f)) for f in self.list]
 
    def name_list(self):
       return([f.split('.')[0] for f in self.list])
 
-   def load_surface(self,name):
+   def get_surface(self,name):
       index = self.name_list().index(name)
-      return pygame.image.load(os.path.join(self.path,self.list[index]))
+      return self.surfaces[index]
 
 class Map:
 
@@ -106,22 +131,62 @@ class Map:
       self.offsety = offsety
 
       defaultTile = tiles.name_list()[0]
-      self.data = [[defaultTile] * height] * width
+      self.data = [[defaultTile for i in range(height)] for j in range(width)]
       self.surface = pygame.Surface((self.width*self.scale*ISOWIDTH,((self.height*self.scale)>>1)*ISOHEIGHT+HEIGHT*self.scale))
- 
-   def isoPos(pos):
+
+      self.previewTile = None
+      self.previewX = 0
+      self.previewY = 0
+
+   def isoPos(self,pos):
       (x,y) = pos
       ix = x*ISOWIDTH+(y%2)*(ISOWIDTH>>1)
       iy = (y*ISOHEIGHT)>>1
       return(ix,iy)
 
+   def closestTile(self,pos):
+      minDist = None
+      closeX = 0
+      closeY = 0
+
+      for y in range(self.height):
+         for x in range(self.width-y%2):
+            (ix,iy) = self.isoPos((x,y))
+            delx =  pos[0] - (self.offsetx + (self.scale*(ix+CENTERX)))
+            dely =  pos[1] - (self.offsety + (self.scale*(iy+CENTERY)))
+            dist = delx**2 + dely**2
+            if ((minDist is None) or (dist < minDist)):
+               minDist = dist
+               closeX = x
+               closeY = y
+
+      return(closeX,closeY)
+
+   def preview(self,tile,pos):
+      (self.previewX,self.previewY) = self.closestTile(pos)
+      self.previewTile = tile
+
+   def paint(self,tile,pos):
+      (self.previewX,self.previewY) = self.closestTile(pos)
+      self.previewTile = tile
+      self.data[self.previewX][self.previewY]=tile
+
+   def clear_preview(self):
+      self.previewTile = None
+
    def draw(self):
       self.surface.fill(BACKGROUND)
       for y in range(self.height):
          for x in range(self.width-y%2):
-            tile =  pygame.transform.scale(self.tiles.load_surface(self.data[x][y]),(WIDTH*self.scale,HEIGHT*self.scale))
-            (ix,iy) = Map.isoPos((x,y))
+            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y]),(WIDTH*self.scale,HEIGHT*self.scale))
+            (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
+
+      if self.previewTile is not None:
+         tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile),(WIDTH*self.scale,HEIGHT*self.scale))
+         tile.fill((200,200,0,128),None,BLEND_RGBA_MULT)
+         (ix,iy) = self.isoPos((self.previewX,self.previewY))
+         self.surface.blit(tile,(self.scale*ix,self.scale*iy))
       return self.surface
 
    def get_surface(self):
@@ -129,6 +194,9 @@ class Map:
 
    def get_rect(self):
       return self.surface.get_rect(top=self.offsety,left=self.offsetx)
+
+   def checkPoint(self,pos):
+      return self.get_rect().collidepoint(pos)
 
 def getFiles(path):
    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
@@ -149,19 +217,19 @@ def main():
 
    manager = pygame_gui.UIManager(SCREENSIZE)
 
+   currentTile = tiles.name_list()[0]
    tileSelect = pygame_gui.elements.ui_drop_down_menu.UIDropDownMenu(options_list=tiles.name_list(),
-                                                                     starting_option=tiles.name_list()[0],
+                                                                     starting_option=currentTile,
                                                                      relative_rect=pygame.Rect((0,0),(200,22)),
                                                                      manager=manager)
 
 
-   shape = tiles.load_surface(tiles.name_list()[0])
+   shape = tiles.get_surface(tiles.name_list()[0])
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
 
-   map = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
-   map.draw()
-
+   isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
    (lastX,lastY) = (0,0)
+   lastColor = MASKED
 
    while True:
 
@@ -172,37 +240,58 @@ def main():
             pygame.quit()
             return
          elif event.type == MOUSEBUTTONDOWN:
-            if (event.button == 1):
-               color = WHITE
-            elif (event.button == 3):
-               color = BLACK
-            elif (event.button == 2):
-               color = MASKED
-            if (canvas.checkPoint(event.pos)):
+            if canvas.checkPoint(event.pos):
+               if (event.button == 1):
+                  color = WHITE
+               elif (event.button == 3):
+                  color = BLACK
+               else:
+                  color = MASKED
                canvas.paint(event.pos,color)
                lastColor = color
+            elif (isomap.checkPoint(event.pos)):
+               isomap.paint(currentTile,event.pos)
+
+
          elif event.type == MOUSEMOTION:
-            if (canvas.checkPoint(event.pos) and
-               (event.buttons[0] or event.buttons[1] or event.buttons[2])):
-               canvas.paint(event.pos,color)
+            if (canvas.checkPoint(event.pos)):
+               if (event.buttons[0] or event.buttons[1] or event.buttons[2]):
+                  canvas.paint(event.pos,lastColor)
                (lastX,lastY) = canvas.coord(event.pos)
 
-         elif event.type == TEXTINPUT:
-            if event.text == 'h':
+            if (isomap.checkPoint(event.pos)):
+               if (event.buttons[0]):
+                  isomap.paint(currentTile,event.pos)
+               else:
+                  isomap.preview(currentTile,event.pos)
+            else:
+               isomap.clear_preview()
+
+         elif event.type == KEYDOWN:
+            if event.key == K_h:
                # flip horizontal
                canvas.flip()
                #shapeArray = shapeArray[::-1,:]
-            elif event.text == 's':
+            elif event.key == K_LEFT:
+               canvas.left()
+            elif event.key == K_RIGHT:
+               canvas.right()
+            elif event.key == K_UP:
+               canvas.up()
+            elif event.key == K_DOWN:
+               canvas.down()
+            elif event.key == K_s:
                # save
                print("Saved to iso.png")
                pygame.image.save(canvas.get_preview(),"iso.png")
-            elif event.text == 'l':
+            elif event.key == K_l:
                # load
                print("Load from iso.png")
                canvas.set_image(pygame.image.load("iso.png"))
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
-               canvas.set_image(tiles.load_surface(event.text))
+               currentTile = event.text
+               canvas.set_image(tiles.get_surface(currentTile))
 
          manager.process_events(event)
 
@@ -210,17 +299,19 @@ def main():
 
 
       screen.fill(BACKGROUND)
+
       canvas.draw()
       screen.blit(canvas.get_surface(),canvas.get_rect())
 
+      isomap.draw()
+      screen.blit(isomap.get_surface(),isomap.get_rect())
+
       preview = canvas.get_preview()
       previewScaled = pygame.transform.scale(preview,(PREVIEWWIDTH,PREVIEWHEIGHT))
-      #previewScaled.fill((200,200,0,128),None,BLEND_RGBA_MULT)
 
       screen.blit(preview,(PREVIEWX,PREVIEWY))
       screen.blit(previewScaled,(PREVIEWX+WIDTH+5,PREVIEWY))
 
-      screen.blit(map.get_surface(),map.get_rect())
 
       screen.blit(font.render("x={:02}, y={:02}".format(lastX-19,HEIGHT-1-lastY-14),True,WHITE,BLACK),(5,600))
 
