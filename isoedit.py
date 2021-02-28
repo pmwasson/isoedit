@@ -29,6 +29,10 @@ PREVIEWSCALE = 2
 PREVIEWHEIGHT = HEIGHT*PREVIEWSCALE
 PREVIEWWIDTH = WIDTH*PREVIEWSCALE
 
+MAPSCALE = 2
+MAPX = 5
+MAPY = 140
+
 
 class PixelCanvas:
 
@@ -91,15 +95,45 @@ class TileList:
       index = self.name_list().index(name)
       return pygame.image.load(os.path.join(self.path,self.list[index]))
 
+class Map:
+
+   def __init__(self,tiles,width,height,scale,offsetx=0,offsety=0):
+      self.tiles = tiles
+      self.width = width
+      self.height = height
+      self.scale = scale
+      self.offsetx = offsetx
+      self.offsety = offsety
+
+      defaultTile = tiles.name_list()[0]
+      self.data = [[defaultTile] * height] * width
+      self.surface = pygame.Surface((self.width*self.scale*ISOWIDTH,((self.height*self.scale)>>1)*ISOHEIGHT+HEIGHT*self.scale))
+ 
+   def isoPos(pos):
+      (x,y) = pos
+      ix = x*ISOWIDTH+(y%2)*(ISOWIDTH>>1)
+      iy = (y*ISOHEIGHT)>>1
+      return(ix,iy)
+
+   def draw(self):
+      self.surface.fill(BACKGROUND)
+      for y in range(self.height):
+         for x in range(self.width-y%2):
+            tile =  pygame.transform.scale(self.tiles.load_surface(self.data[x][y]),(WIDTH*self.scale,HEIGHT*self.scale))
+            (ix,iy) = Map.isoPos((x,y))
+            self.surface.blit(tile,(self.scale*ix,self.scale*iy))
+      return self.surface
+
+   def get_surface(self):
+      return self.surface
+
+   def get_rect(self):
+      return self.surface.get_rect(top=self.offsety,left=self.offsetx)
+
 def getFiles(path):
    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
    return(files)
 
-def isoPos(pos):
-   (x,y) = pos
-   ix = x*ISOWIDTH+(y%2)*(ISOWIDTH>>1)
-   iy = (y*ISOHEIGHT)>>1
-   return(ix,iy)
 
 def main():
 
@@ -117,12 +151,16 @@ def main():
 
    tileSelect = pygame_gui.elements.ui_drop_down_menu.UIDropDownMenu(options_list=tiles.name_list(),
                                                                      starting_option=tiles.name_list()[0],
-                                                                     relative_rect=pygame.Rect((0,0),(120,22)),
+                                                                     relative_rect=pygame.Rect((0,0),(200,22)),
                                                                      manager=manager)
 
 
    shape = tiles.load_surface(tiles.name_list()[0])
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
+
+   map = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
+   map.draw()
+
    (lastX,lastY) = (0,0)
 
    while True:
@@ -148,6 +186,7 @@ def main():
                (event.buttons[0] or event.buttons[1] or event.buttons[2])):
                canvas.paint(event.pos,color)
                (lastX,lastY) = canvas.coord(event.pos)
+
          elif event.type == TEXTINPUT:
             if event.text == 'h':
                # flip horizontal
@@ -181,10 +220,7 @@ def main():
       screen.blit(preview,(PREVIEWX,PREVIEWY))
       screen.blit(previewScaled,(PREVIEWX+WIDTH+5,PREVIEWY))
 
-      for y in range(16):
-         for x in range(7-y%2):
-            (ix,iy) = isoPos((x,y))
-            screen.blit(previewScaled,(PREVIEWX+PREVIEWSCALE*ix,PREVIEWY+PREVIEWHEIGHT+5+PREVIEWSCALE*iy))
+      screen.blit(map.get_surface(),map.get_rect())
 
       screen.blit(font.render("x={:02}, y={:02}".format(lastX-19,HEIGHT-1-lastY-14),True,WHITE,BLACK),(5,600))
 
