@@ -46,6 +46,7 @@ class PixelCanvas:
       self.surface = pygame.Surface((self.width*self.scale,self.height*self.scale))
       self.offsetx = offsetx
       self.offsety = offsety
+      self.lastColor = MASKED
 
    def get_surface(self):
       return self.surface
@@ -94,9 +95,20 @@ class PixelCanvas:
       return ( int((pos[0]-self.offsetx) / self.scale),
                int((pos[1]-self.offsety) / self.scale) )
 
-   def paint(self,pos,color):
+   def button_color(self, button):
+      if button is None:
+         return self.lastColor
+      elif (button == 1):
+         return WHITE
+      elif (button == 3):
+         return BLACK 
+      return MASKED
+
+   def paint(self,pos,button):
       (x,y) = self.coord(pos)
+      color = self.button_color(button)
       self.sarray[x,y] = color
+      self.lastColor = color
 
    def set_image(self,surface):
       self.sarray = pygame.PixelArray(surface)
@@ -229,7 +241,6 @@ def main():
 
    isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
    (lastX,lastY) = (0,0)
-   lastColor = MASKED
 
    while True:
 
@@ -239,24 +250,17 @@ def main():
          if event.type == QUIT:
             pygame.quit()
             return
+
          elif event.type == MOUSEBUTTONDOWN:
             if canvas.checkPoint(event.pos):
-               if (event.button == 1):
-                  color = WHITE
-               elif (event.button == 3):
-                  color = BLACK
-               else:
-                  color = MASKED
-               canvas.paint(event.pos,color)
-               lastColor = color
+               canvas.paint(event.pos,event.button)
             elif (isomap.checkPoint(event.pos)):
                isomap.paint(currentTile,event.pos)
-
 
          elif event.type == MOUSEMOTION:
             if (canvas.checkPoint(event.pos)):
                if (event.buttons[0] or event.buttons[1] or event.buttons[2]):
-                  canvas.paint(event.pos,lastColor)
+                  canvas.paint(event.pos,None)
                (lastX,lastY) = canvas.coord(event.pos)
 
             if (isomap.checkPoint(event.pos)):
