@@ -1,4 +1,6 @@
+from collections import defaultdict 
 import os
+import re
 import pygame
 from pygame.locals import *
 import pygame_gui
@@ -114,23 +116,59 @@ class PixelCanvas:
       self.sarray = pygame.PixelArray(surface)
 
 
+class Tile:
+   def __init__(self,path,name,framecount=0):
+      self.path = path
+      self.name = name
+      self.framecount = framecount
+
+      if (framecount > 0):
+         self.surface = [ self.read(f) for f in range(framecount)]
+      else:
+         self.surface = [ self.read() ]
+
+   def read(self,frame=None):
+      if frame is None:
+         return pygame.image.load(os.path.join(self.path,self.name + ".png"))
+      else:
+         return pygame.image.load(os.path.join(self.path,self.name + "_f" + str(frame) + ".png"))
+
+   def get_surface(self,frame):
+      index = min(frame,max(0,self.framecount-1))
+      return self.surface[index]
+
 class TileList:
 
    def __init__(self,path):
       self.path = path
-      self.list = None
-      self.surfaces = None
+      self.tiles = {}
 
    def read(self):
-      self.list = [f for f in os.listdir(self.path) if os.path.isfile(os.path.join(self.path,f)) and (f.find('.png') != -1)]
-      self.surfaces = [pygame.image.load(os.path.join(self.path,f)) for f in self.list]
+      # get a list of all .png fles in the directory
+      filelist = [f.split('.')[0] for f in os.listdir(self.path) if os.path.isfile(os.path.join(self.path,f)) and (f.find('.png') != -1)]
+
+      # group into frames
+      framelist = defaultdict(int)
+      for f in filelist:
+         m = re.search('(.*)_f([0-7])',f)
+         if m is None:
+            framelist[f] = 0
+         else:
+            name = m.group(1)
+            frame = m.group(2)
+            framelist[name] = max(int(frame)+1,framelist[name])
+
+      # create a tile per set
+      for n in framelist.keys():
+         self.tiles[n] = Tile(self.path,n,framelist[n])
 
    def name_list(self):
-      return([f.split('.')[0] for f in self.list])
+      return(list(self.tiles.keys()))
 
-   def get_surface(self,name):
-      index = self.name_list().index(name)
-      return self.surfaces[index]
+   def get_surface(self,name,frame):
+      tile = self.tiles[name]
+      surface = tile.get_surface(frame)
+      return surface
 
 class Map:
 
@@ -186,16 +224,23 @@ class Map:
    def clear_preview(self):
       self.previewTile = None
 
-   def draw(self):
+   def draw(self,framecount):
       self.surface.fill(BACKGROUND)
+
+
       for y in range(self.height):
          for x in range(self.width-y%2):
-            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y]),(WIDTH*self.scale,HEIGHT*self.scale))
+
+            frame = (((framecount) >> 4)+x) & 0x7
+            if frame > 3:
+               frame = 7 - frame
+
+            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y],frame),(WIDTH*self.scale,HEIGHT*self.scale))
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
       if self.previewTile is not None:
-         tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile),(WIDTH*self.scale,HEIGHT*self.scale))
+         tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile,0),(WIDTH*self.scale,HEIGHT*self.scale))
          tile.fill((200,200,0,128),None,BLEND_RGBA_MULT)
          (ix,iy) = self.isoPos((self.previewX,self.previewY))
          self.surface.blit(tile,(self.scale*ix,self.scale*iy))
@@ -209,10 +254,6 @@ class Map:
 
    def checkPoint(self,pos):
       return self.get_rect().collidepoint(pos)
-
-def getFiles(path):
-   files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
-   return(files)
 
 
 def main():
@@ -236,15 +277,21 @@ def main():
                                                                      manager=manager)
 
 
-   shape = tiles.get_surface(tiles.name_list()[0])
+   shape = tiles.get_surface(tiles.name_list()[0],0)
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
 
    isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
    (lastX,lastY) = (0,0)
+   framecount = 0
+
 
    while True:
 
       time_delta = clock.tick(60)/1000.0
+
+      # keep a 16 bit counter
+      framecount = (framecount + 1) & 0xffff
+
 
       for event in pygame.event.get():
          if event.type == QUIT:
@@ -295,7 +342,7 @@ def main():
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                currentTile = event.text
-               canvas.set_image(tiles.get_surface(currentTile))
+               canvas.set_image(tiles.get_surface(currentTile,0))
 
          manager.process_events(event)
 
@@ -307,7 +354,7 @@ def main():
       canvas.draw()
       screen.blit(canvas.get_surface(),canvas.get_rect())
 
-      isomap.draw()
+      isomap.draw(framecount)
       screen.blit(isomap.get_surface(),isomap.get_rect())
 
       preview = canvas.get_preview()
