@@ -210,14 +210,14 @@ class Map:
                closeX = x
                closeY = y
 
-      return(closeX,closeY)
+      return(closeX,closeY,self.data[closeX][closeY])
 
    def preview(self,tile,pos):
-      (self.previewX,self.previewY) = self.closestTile(pos)
+      (self.previewX,self.previewY,name) = self.closestTile(pos)
       self.previewTile = tile
 
    def paint(self,tile,pos):
-      (self.previewX,self.previewY) = self.closestTile(pos)
+      (self.previewX,self.previewY,name) = self.closestTile(pos)
       self.previewTile = tile
       self.data[self.previewX][self.previewY]=tile
 
@@ -281,9 +281,8 @@ def main():
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
 
    isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
-   (lastX,lastY) = (0,0)
    framecount = 0
-
+   info = None
 
    while True:
 
@@ -308,13 +307,18 @@ def main():
             if (canvas.checkPoint(event.pos)):
                if (event.buttons[0] or event.buttons[1] or event.buttons[2]):
                   canvas.paint(event.pos,None)
-               (lastX,lastY) = canvas.coord(event.pos)
+               (x,y) = canvas.coord(event.pos)
+               info = font.render("Pixel x={:02}, y={:02}".format(x,HEIGHT-1-y),True,WHITE,BLACK)
+
 
             if (isomap.checkPoint(event.pos)):
                if (event.buttons[0]):
                   isomap.paint(currentTile,event.pos)
                else:
                   isomap.preview(currentTile,event.pos)
+               (x,y,name)=isomap.closestTile(event.pos)
+               info = font.render("Tile x={:02}, y={:02}: {}".format(x,y,name),True,WHITE,BLACK)
+
             else:
                isomap.clear_preview()
 
@@ -363,9 +367,10 @@ def main():
       screen.blit(preview,(PREVIEWX,PREVIEWY))
       screen.blit(previewScaled,(PREVIEWX+WIDTH+5,PREVIEWY))
 
+      if (info is not None):
+         screen.blit(info,(5,600))
 
-      screen.blit(font.render("x={:02}, y={:02}".format(lastX-19,HEIGHT-1-lastY-14),True,WHITE,BLACK),(5,600))
-
+      
       manager.draw_ui(screen)
 
       pygame.display.flip()
