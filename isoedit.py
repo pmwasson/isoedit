@@ -285,7 +285,8 @@ def main():
    tileSelect = pygame_gui.elements.ui_drop_down_menu.UIDropDownMenu(options_list=tiles.name_list(),
                                                                      starting_option=currentTile,
                                                                      relative_rect=pygame.Rect((0,0),(200,22)),
-                                                                     manager=manager)
+                                                                     manager=manager,
+                                                                     expansion_height_limit=125)
 
 
    shape = tiles.get_surface(tiles.name_list()[0],0)
