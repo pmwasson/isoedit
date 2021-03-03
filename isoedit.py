@@ -57,7 +57,7 @@ class PixelCanvas:
       return self.surface.get_rect(top=self.offsety,left=self.offsetx)
 
    def draw(self):
-
+      self.surface.fill(BACKGROUND)
       for y in range(self.height):
          for x in range(self.width):
             color = self.sarray[x,y]
@@ -238,6 +238,10 @@ class Map:
             tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y],frame),(WIDTH*self.scale,HEIGHT*self.scale))
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
+
+            if (x==3) and (y==6):
+               tile =  pygame.transform.scale(self.tiles.get_surface('sphere',frame),(WIDTH*self.scale,HEIGHT*self.scale))
+               self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
       if self.previewTile is not None:
          tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile,0),(WIDTH*self.scale,HEIGHT*self.scale))
