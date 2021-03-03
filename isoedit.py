@@ -166,8 +166,14 @@ class TileList:
       return(list(self.tiles.keys()))
 
    def get_surface(self,name,frame):
-      tile = self.tiles[name]
-      surface = tile.get_surface(frame)
+      surface = None
+      for t in name.split(','):
+         tile = self.tiles[t]
+         if surface is None:
+            surface = tile.get_surface(frame)
+         else:
+            surface = surface.copy()
+            surface.blit(tile.get_surface(frame).copy(),(0,0))
       return surface
 
 class Map:
@@ -216,10 +222,14 @@ class Map:
       (self.previewX,self.previewY,name) = self.closestTile(pos)
       self.previewTile = tile
 
-   def paint(self,tile,pos):
+   def paint(self,tile,pos,append=False):
       (self.previewX,self.previewY,name) = self.closestTile(pos)
-      self.previewTile = tile
-      self.data[self.previewX][self.previewY]=tile
+      if append:
+         self.previewTile = self.data[self.previewX][self.previewY] + ',' + tile
+      else:
+         self.previewTile = tile
+
+      self.data[self.previewX][self.previewY]=self.previewTile
 
    def clear_preview(self):
       self.previewTile = None
@@ -239,9 +249,6 @@ class Map:
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
-            if (x==3) and (y==6):
-               tile =  pygame.transform.scale(self.tiles.get_surface('sphere',frame),(WIDTH*self.scale,HEIGHT*self.scale))
-               self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
       if self.previewTile is not None:
          tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile,0),(WIDTH*self.scale,HEIGHT*self.scale))
@@ -305,7 +312,7 @@ def main():
             if canvas.checkPoint(event.pos):
                canvas.paint(event.pos,event.button)
             elif (isomap.checkPoint(event.pos)):
-               isomap.paint(currentTile,event.pos)
+               isomap.paint(currentTile,event.pos,event.button==3)
 
          elif event.type == MOUSEMOTION:
             if (canvas.checkPoint(event.pos)):
