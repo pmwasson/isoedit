@@ -117,10 +117,10 @@ class PixelCanvas:
 
 
 class Tile:
-   def __init__(self,path,name,framecount=0):
+   def __init__(self,path,name,framecount=0,animation=None):
       self.path = path
       self.name = name
-      self.framecount = framecount
+      self.animation = animation
 
       if (framecount > 0):
          self.surface = [ self.read(f) for f in range(framecount)]
@@ -131,10 +131,28 @@ class Tile:
       if frame is None:
          return pygame.image.load(os.path.join(self.path,self.name + ".png"))
       else:
-         return pygame.image.load(os.path.join(self.path,self.name + "_f" + str(frame) + ".png"))
+         return pygame.image.load(os.path.join(self.path,self.name + "_" + self.animation + str(frame) + ".png"))
 
-   def get_surface(self,frame):
-      index = min(frame,max(0,self.framecount-1))
+   def animationFrame(self,framecount,x):
+      if (self.animation is None):
+         return 0
+      elif (self.animation == 'w'):
+         # Wave
+         frame = (((framecount) >> 4)+x) & 0x7
+         if frame > 3:
+            frame = 7 - frame
+         return frame
+      elif (self.animation == 'l'):
+         # Linear
+         frame = ((framecount) >> 5) % len(self.surface)
+         return frame
+      # must be blink
+      elif ((((framecount>>3)^x)&0x3f) == 0):
+         return 1
+      return 0
+
+   def get_surface(self,frameCount,x):
+      index = self.animationFrame(frameCount,x)
       return self.surface[index]
 
 class TileList:
@@ -149,31 +167,34 @@ class TileList:
 
       # group into frames
       framelist = defaultdict(int)
+      animation = {}
       for f in filelist:
-         m = re.search('(.*)_f([0-7])',f)
+         m = re.search('(.*)_([lbw])([0-7])',f)
          if m is None:
             framelist[f] = 0
+            animation[f] = None
          else:
             name = m.group(1)
-            frame = m.group(2)
+            anitype = m.group(2)
+            frame = m.group(3)
             framelist[name] = max(int(frame)+1,framelist[name])
-
+            animation[name] = anitype
       # create a tile per set
       for n in framelist.keys():
-         self.tiles[n] = Tile(self.path,n,framelist[n])
+         self.tiles[n] = Tile(self.path,n,framelist[n],animation[n])
 
    def name_list(self):
       return(list(self.tiles.keys()))
 
-   def get_surface(self,name,frame):
+   def get_surface(self,name,frameCount=0,x=0):
       surface = None
       for t in name.split(','):
          tile = self.tiles[t]
          if surface is None:
-            surface = tile.get_surface(frame)
+            surface = tile.get_surface(frameCount,x)
          else:
             surface = surface.copy()
-            surface.blit(tile.get_surface(frame).copy(),(0,0))
+            surface.blit(tile.get_surface(frameCount,x).copy(),(0,0))
       return surface
 
 class Map:
@@ -240,12 +261,7 @@ class Map:
 
       for y in range(self.height):
          for x in range(self.width-y%2):
-
-            frame = (((framecount) >> 4)+x) & 0x7
-            if frame > 3:
-               frame = 7 - frame
-
-            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y],frame),(WIDTH*self.scale,HEIGHT*self.scale))
+            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y],framecount,x),(WIDTH*self.scale,HEIGHT*self.scale))
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
@@ -289,7 +305,7 @@ def main():
                                                                      expansion_height_limit=125)
 
 
-   shape = tiles.get_surface(tiles.name_list()[0],0)
+   shape = tiles.get_surface(tiles.name_list()[0])
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
 
    isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
