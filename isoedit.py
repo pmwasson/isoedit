@@ -282,6 +282,32 @@ class Map:
    def checkPoint(self,pos):
       return self.get_rect().collidepoint(pos)
 
+# return 1-bit color and mask
+def colorTo1Bit(color):
+   brightness = (0.21 * color[0]) + (0.72 * color[1]) + (0.07 * color[2])
+   return(brightness > 128, color[3] > 200)
+
+def outputBytes(surface):
+   size = surface.get_rect()
+   colorByte = 0
+   maskByte = 0
+   surfaceBytes = bytearray()
+   for x in range(size.w):
+      for y in range(size.h):
+         (color,mask) = colorTo1Bit(surface.get_at((x,y)))
+         bitPos = y % 8
+         colorByte = colorByte | (color<<bitPos)
+         maskByte =  maskByte  | (mask <<bitPos)
+         if (bitPos == 7):
+            surfaceBytes.append(colorByte)
+            surfaceBytes.append(maskByte)
+            colorByte = 0
+            maskByte = 0
+   filename = 'test.dat'
+   with open(filename, "wb") as binary_file:
+      # Write text or bytes to the file
+      byteCount = binary_file.write(surfaceBytes)
+      print("Wrote {} bytes to {}".format(byteCount,filename))
 
 def main():
 
@@ -371,6 +397,10 @@ def main():
                # load
                print("Load from iso.png")
                canvas.set_image(pygame.image.load("iso.png"))
+            elif event.key == K_d:
+               # dump
+               print("Output bytes")
+               outputBytes(canvas.get_preview())
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                currentTile = event.text
