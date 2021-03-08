@@ -151,9 +151,15 @@ class Tile:
          return 1
       return 0
 
-   def get_surface(self,frameCount,x):
+   def get_animated_surface(self,frameCount,x):
       index = self.animationFrame(frameCount,x)
       return self.surface[index]
+
+   def get_surface(self,frame):
+      return self.surface[frame]
+
+   def get_frame_count(self):
+      return len(self.surface)
 
 class TileList:
 
@@ -186,16 +192,22 @@ class TileList:
    def name_list(self):
       return(list(self.tiles.keys()))
 
-   def get_surface(self,name,frameCount=0,x=0):
+   def get_frame_count(self,name):
+      return(self.tiles[name].get_frame_count())
+
+   def get_animated_surface(self,name,frameCount=0,x=0):
       surface = None
       for t in name.split(','):
          tile = self.tiles[t]
          if surface is None:
-            surface = tile.get_surface(frameCount,x)
+            surface = tile.get_animated_surface(frameCount,x)
          else:
             surface = surface.copy()
-            surface.blit(tile.get_surface(frameCount,x).copy(),(0,0))
+            surface.blit(tile.get_animated_surface(frameCount,x).copy(),(0,0))
       return surface
+
+   def get_surface(self,name,frame=0):
+      return(self.tiles[name].get_surface(frame))
 
 class Map:
 
@@ -261,7 +273,7 @@ class Map:
 
       for y in range(self.height):
          for x in range(self.width-y%2):
-            tile =  pygame.transform.scale(self.tiles.get_surface(self.data[x][y],framecount,x),(WIDTH*self.scale,HEIGHT*self.scale))
+            tile =  pygame.transform.scale(self.tiles.get_animated_surface(self.data[x][y],framecount,x),(WIDTH*self.scale,HEIGHT*self.scale))
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
@@ -287,27 +299,49 @@ def colorTo1Bit(color):
    brightness = (0.21 * color[0]) + (0.72 * color[1]) + (0.07 * color[2])
    return(brightness > 128, color[3] > 200)
 
-def outputBytes(surface):
-   size = surface.get_rect()
-   colorByte = 0
-   maskByte = 0
-   surfaceBytes = bytearray()
-   for x in range(size.w):
-      for y in range(size.h):
-         (color,mask) = colorTo1Bit(surface.get_at((x,y)))
-         bitPos = y % 8
-         colorByte = colorByte | (color<<bitPos)
-         maskByte =  maskByte  | (mask <<bitPos)
-         if (bitPos == 7):
-            surfaceBytes.append(colorByte)
-            surfaceBytes.append(maskByte)
-            colorByte = 0
-            maskByte = 0
-   filename = 'test.dat'
-   with open(filename, "wb") as binary_file:
-      # Write text or bytes to the file
-      byteCount = binary_file.write(surfaceBytes)
-      print("Wrote {} bytes to {}".format(byteCount,filename))
+def outputBytes(tiles,filename='tiles'):
+
+   binFilename = filename+".bin"
+   infoFilename = filename+".txt"
+
+   outputInfo = []
+   outputBytes = bytearray();
+
+   tileNumber = 0
+
+   for t in tiles.name_list():
+      framecount = tiles.get_frame_count(t)
+      info = '0x{:04x},  // {:3} : {:20}  - frames {:2}'.format(len(outputBytes),tileNumber,t,framecount)
+      print(info)
+      outputInfo.append(info)
+      tileNumber = tileNumber + 1
+
+      outputBytes.append(WIDTH);
+      outputBytes.append(HEIGHT);
+
+      for f in range(framecount):
+         surface = tiles.get_surface(t,f)
+         size = surface.get_rect()
+         colorByte = 0
+         maskByte = 0
+         for x in range(size.w):
+            for y in range(size.h):
+               (color,mask) = colorTo1Bit(surface.get_at((x,y)))
+               bitPos = y % 8
+               colorByte = colorByte | (color<<bitPos)
+               maskByte =  maskByte  | (mask <<bitPos)
+               if (bitPos == 7):
+                  outputBytes.append(colorByte)
+                  outputBytes.append(maskByte)
+                  colorByte = 0
+                  maskByte = 0
+   with open(binFilename, "wb") as binary_file:
+      byteCount = binary_file.write(outputBytes)
+      print("Wrote {} bytes to {}".format(byteCount,binFilename))
+
+   with open(infoFilename, "w") as text_file:
+      byteCount = text_file.write('\n'.join(outputInfo))
+      print("Wrote {} bytes to {}".format(byteCount,infoFilename))
 
 def main():
 
@@ -399,8 +433,8 @@ def main():
                canvas.set_image(pygame.image.load("iso.png"))
             elif event.key == K_d:
                # dump
-               print("Output bytes")
-               outputBytes(canvas.get_preview())
+               print("Dumping tile data")
+               outputBytes(tiles)
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                currentTile = event.text
