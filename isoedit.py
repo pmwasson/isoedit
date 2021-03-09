@@ -279,7 +279,7 @@ class Map:
 
 
       if self.previewTile is not None:
-         tile =  pygame.transform.scale(self.tiles.get_surface(self.previewTile,0),(WIDTH*self.scale,HEIGHT*self.scale))
+         tile =  pygame.transform.scale(self.tiles.get_animated_surface(self.previewTile,0),(WIDTH*self.scale,HEIGHT*self.scale))
          tile.fill((200,200,0,128),None,BLEND_RGBA_MULT)
          (ix,iy) = self.isoPos((self.previewX,self.previewY))
          self.surface.blit(tile,(self.scale*ix,self.scale*iy))
@@ -311,30 +311,29 @@ def outputBytes(tiles,filename='tiles'):
 
    for t in tiles.name_list():
       framecount = tiles.get_frame_count(t)
-      info = '0x{:04x},  // {:3} : {:20}  - frames {:2}'.format(len(outputBytes),tileNumber,t,framecount)
+      info = '#define {:30} 0x{:04x} // {:3} frames {:2}'.format('TILE_'+t,len(outputBytes),tileNumber,framecount)
       print(info)
       outputInfo.append(info)
       tileNumber = tileNumber + 1
 
+      outputBytes.append(0);  # upper byte
       outputBytes.append(WIDTH);
+      outputBytes.append(0);  # upper byte
       outputBytes.append(HEIGHT);
 
       for f in range(framecount):
          surface = tiles.get_surface(t,f)
          size = surface.get_rect()
-         colorByte = 0
-         maskByte = 0
-         for x in range(size.w):
-            for y in range(size.h):
-               (color,mask) = colorTo1Bit(surface.get_at((x,y)))
-               bitPos = y % 8
-               colorByte = colorByte | (color<<bitPos)
-               maskByte =  maskByte  | (mask <<bitPos)
-               if (bitPos == 7):
-                  outputBytes.append(colorByte)
-                  outputBytes.append(maskByte)
-                  colorByte = 0
-                  maskByte = 0
+         for y in range(size.h // 8):
+            for x in range(size.w):
+               colorByte = 0
+               maskByte = 0
+               for bitPos in range(8):
+                  (color,mask) = colorTo1Bit(surface.get_at((x,y*8+bitPos)))
+                  colorByte = colorByte | (color<<bitPos)
+                  maskByte =  maskByte  | (mask <<bitPos)
+               outputBytes.append(colorByte)
+               outputBytes.append(maskByte)
    with open(binFilename, "wb") as binary_file:
       byteCount = binary_file.write(outputBytes)
       print("Wrote {} bytes to {}".format(byteCount,binFilename))
