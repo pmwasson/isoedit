@@ -213,14 +213,19 @@ class Map:
 
    def __init__(self,tiles,width,height,scale,offsetx=0,offsety=0):
       self.tiles = tiles
-      self.width = width
-      self.height = height
+      self.width = width      # display width
+      self.height = height    # display height
       self.scale = scale
       self.offsetx = offsetx
       self.offsety = offsety
 
-      defaultTile = tiles.name_list()[0]
-      self.data = [[defaultTile for i in range(height)] for j in range(width)]
+      self.sizew = 128
+      self.sizeh = 128
+      self.posx = 0
+      self.posy = 0
+
+      defaultTile = 'grass'
+      self.data = [[defaultTile for i in range(self.sizeh)] for j in range(self.sizew)]
       self.surface = pygame.Surface((self.width*self.scale*ISOWIDTH,((self.height*self.scale)>>1)*ISOHEIGHT+HEIGHT*self.scale))
 
       self.previewTile = None
@@ -249,7 +254,7 @@ class Map:
                closeX = x
                closeY = y
 
-      return(closeX,closeY,self.data[closeX][closeY])
+      return(closeX,closeY,self.data[self.posx + closeX][self.posy + closeY])
 
    def preview(self,tile,pos):
       (self.previewX,self.previewY,name) = self.closestTile(pos)
@@ -258,11 +263,11 @@ class Map:
    def paint(self,tile,pos,append=False):
       (self.previewX,self.previewY,name) = self.closestTile(pos)
       if append:
-         self.previewTile = self.data[self.previewX][self.previewY] + ',' + tile
+         self.previewTile = self.data[self.posx + self.previewX][self.posy + self.previewY] + ',' + tile
       else:
          self.previewTile = tile
 
-      self.data[self.previewX][self.previewY]=self.previewTile
+      self.data[self.posx + self.previewX][self.posy + self.previewY]=self.previewTile
 
    def clear_preview(self):
       self.previewTile = None
@@ -273,7 +278,7 @@ class Map:
 
       for y in range(self.height):
          for x in range(self.width-y%2):
-            tile =  pygame.transform.scale(self.tiles.get_animated_surface(self.data[x][y],framecount,x),(WIDTH*self.scale,HEIGHT*self.scale))
+            tile =  pygame.transform.scale(self.tiles.get_animated_surface(self.data[self.posx+x][self.posy+y],framecount,x),(WIDTH*self.scale,HEIGHT*self.scale))
             (ix,iy) = self.isoPos((x,y))
             self.surface.blit(tile,(self.scale*ix,self.scale*iy))
 
@@ -294,6 +299,26 @@ class Map:
    def checkPoint(self,pos):
       return self.get_rect().collidepoint(pos)
 
+   def up(self,step):
+      self.posy = self.posy - step
+      if (self.posy < 0):
+         self.posy = 0
+
+   def down(self,step):
+      self.posy = self.posy + step
+      if (self.posy + self.height > self.sizeh):
+         self.posy = self.sizeh - self.height
+
+   def left(self,step):
+      self.posx = self.posx - step
+      if (self.posx < 0):
+         self.posx = 0
+
+   def right(self,step):
+      self.posx = self.posx + step
+      if (self.posx + self.width > self.sizew):
+         self.posx = self.sizew - self.width
+
 # return 1-bit color and mask
 def colorTo1Bit(color):
    brightness = (0.21 * color[0]) + (0.72 * color[1]) + (0.07 * color[2])
@@ -309,17 +334,21 @@ def outputBytes(tiles,filename='tiles'):
 
    tileNumber = 0
 
+   info = '#define {:25} 0x{:06x}'.format('TILE_START',len(outputBytes))
+   print(info)
+   outputInfo.append(info)
+
+   outputBytes.append(0);  # upper byte
+   outputBytes.append(WIDTH);
+   outputBytes.append(0);  # upper byte
+   outputBytes.append(HEIGHT);
+
    for t in tiles.name_list():
       framecount = tiles.get_frame_count(t)
-      info = '#define {:30} 0x{:04x} // {:3} frames {:2}'.format('TILE_'+t,len(outputBytes),tileNumber,framecount)
+      info = '#define {:30} {:3} // 0x{:04x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount)
       print(info)
       outputInfo.append(info)
-      tileNumber = tileNumber + 1
-
-      outputBytes.append(0);  # upper byte
-      outputBytes.append(WIDTH);
-      outputBytes.append(0);  # upper byte
-      outputBytes.append(HEIGHT);
+      tileNumber = tileNumber + framecount
 
       for f in range(framecount):
          surface = tiles.get_surface(t,f)
@@ -404,12 +433,13 @@ def main():
                else:
                   isomap.preview(currentTile,event.pos)
                (x,y,name)=isomap.closestTile(event.pos)
-               info = font.render("Tile x={:02}, y={:02}: {}".format(x,y,name),True,WHITE,BLACK)
+               info = font.render("Tile x={:02}, y={:02}: {}".format(isomap.posx+x,isomap.posy+y,name),True,WHITE,BLACK)
 
             else:
                isomap.clear_preview()
 
          elif event.type == KEYDOWN:
+            shift = event.mod & pygame.KMOD_SHIFT
             if event.key == K_h:
                # flip horizontal
                canvas.flip()
@@ -422,18 +452,31 @@ def main():
                canvas.up()
             elif event.key == K_DOWN:
                canvas.down()
-            elif event.key == K_s:
-               # save
-               print("Saved to iso.png")
+            elif event.key == K_o:
+               # Output
+               print("Output to iso.png")
                pygame.image.save(canvas.get_preview(),"iso.png")
-            elif event.key == K_l:
+            elif event.key == K_i:
                # load
-               print("Load from iso.png")
+               print("Input from iso.png")
                canvas.set_image(pygame.image.load("iso.png"))
-            elif event.key == K_d:
-               # dump
-               print("Dumping tile data")
+            elif event.key == K_x:
+               # export
+               print("Export tile data")
                outputBytes(tiles)
+            # MAP movement
+            elif event.key == K_w:
+               isomap.up(14 if shift else 2)
+               info = None
+            elif event.key == K_a:
+               isomap.left(6 if shift else 1)
+               info = None
+            elif event.key == K_s:
+               isomap.down(14 if shift else 2)
+               info = None
+            elif event.key == K_d:
+               isomap.right(6 if shift else 1)
+               info = None
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                currentTile = event.text
