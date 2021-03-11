@@ -224,7 +224,7 @@ class Map:
       self.posx = 0
       self.posy = 0
 
-      defaultTile = 'grass'
+      defaultTile = 'groundGrass0'
       self.data = [[defaultTile for i in range(self.sizeh)] for j in range(self.sizew)]
       self.surface = pygame.Surface((self.width*self.scale*ISOWIDTH,((self.height*self.scale)>>1)*ISOHEIGHT+HEIGHT*self.scale))
 
