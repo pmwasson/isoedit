@@ -388,10 +388,12 @@ def main():
    currentTile = tiles.name_list()[0]
    tileSelect = pygame_gui.elements.ui_drop_down_menu.UIDropDownMenu(options_list=tiles.name_list(),
                                                                      starting_option=currentTile,
-                                                                     relative_rect=pygame.Rect((0,0),(200,22)),
+                                                                     relative_rect=pygame.Rect((100,0),(200,22)),
                                                                      manager=manager,
                                                                      expansion_height_limit=125)
 
+   filterText = pygame_gui.elements.ui_text_entry_line.UITextEntryLine( relative_rect=pygame.Rect((0,0),(100,22)),
+                                                                        manager=manager)
 
    shape = tiles.get_surface(tiles.name_list()[0])
    canvas = PixelCanvas(pygame.PixelArray(shape),SCALE,OFFSETX,OFFSETY)
@@ -399,6 +401,8 @@ def main():
    isomap = Map(tiles,7,16,MAPSCALE,MAPX,MAPY)
    framecount = 0
    info = None
+
+   active = None
 
    while True:
 
@@ -415,72 +419,93 @@ def main():
 
          elif event.type == MOUSEBUTTONDOWN:
             if canvas.checkPoint(event.pos):
+               active = "canvas"
                canvas.paint(event.pos,event.button)
             elif (isomap.checkPoint(event.pos)):
+               active = "map"
                isomap.paint(currentTile,event.pos,event.button==3)
 
          elif event.type == MOUSEMOTION:
             if (canvas.checkPoint(event.pos)):
+               active = "canvas"
                if (event.buttons[0] or event.buttons[1] or event.buttons[2]):
                   canvas.paint(event.pos,None)
                (x,y) = canvas.coord(event.pos)
-               info = font.render("Pixel x={:02}, y={:02}".format(x,HEIGHT-1-y),True,WHITE,BLACK)
+               info = font.render("{}: x={:02}, y={:02}".format(active,x,HEIGHT-1-y),True,WHITE,BLACK)
 
-
-            if (isomap.checkPoint(event.pos)):
+            elif (isomap.checkPoint(event.pos)):
+               active = "map"
                if (event.buttons[0]):
                   isomap.paint(currentTile,event.pos)
                else:
                   isomap.preview(currentTile,event.pos)
                (x,y,name)=isomap.closestTile(event.pos)
-               info = font.render("Tile x={:02}, y={:02}: {}".format(isomap.posx+x,isomap.posy+y,name),True,WHITE,BLACK)
+               info = font.render("{}: x={:02}, y={:02}: {}".format(active,isomap.posx+x,isomap.posy+y,name),True,WHITE,BLACK)
 
             else:
+               active = None
                isomap.clear_preview()
 
          elif event.type == KEYDOWN:
             shift = event.mod & pygame.KMOD_SHIFT
-            if event.key == K_h:
-               # flip horizontal
-               canvas.flip()
-               #shapeArray = shapeArray[::-1,:]
-            elif event.key == K_LEFT:
-               canvas.left()
-            elif event.key == K_RIGHT:
-               canvas.right()
-            elif event.key == K_UP:
-               canvas.up()
-            elif event.key == K_DOWN:
-               canvas.down()
-            elif event.key == K_o:
-               # Output
-               print("Output to iso.png")
-               pygame.image.save(canvas.get_preview(),"iso.png")
-            elif event.key == K_i:
-               # load
-               print("Input from iso.png")
-               canvas.set_image(pygame.image.load("iso.png"))
-            elif event.key == K_x:
-               # export
-               print("Export tile data")
-               outputBytes(tiles)
-            # MAP movement
-            elif event.key == K_w:
-               isomap.up(14 if shift else 2)
-               info = None
-            elif event.key == K_a:
-               isomap.left(6 if shift else 1)
-               info = None
-            elif event.key == K_s:
-               isomap.down(14 if shift else 2)
-               info = None
-            elif event.key == K_d:
-               isomap.right(6 if shift else 1)
-               info = None
+            if (active == "canvas"):
+               if event.key == K_h:
+                  # flip horizontal
+                  canvas.flip()
+                  #shapeArray = shapeArray[::-1,:]
+               elif event.key == K_LEFT:
+                  canvas.left()
+               elif event.key == K_RIGHT:
+                  canvas.right()
+               elif event.key == K_UP:
+                  canvas.up()
+               elif event.key == K_DOWN:
+                  canvas.down()
+               elif event.key == K_o:
+                  # Output
+                  print("Output to iso.png")
+                  pygame.image.save(canvas.get_preview(),"iso.png")
+               elif event.key == K_i:
+                  # load
+                  print("Input from iso.png")
+                  canvas.set_image(pygame.image.load("iso.png"))
+
+            if (active == "map"):
+               if event.key == K_x:
+                  # export
+                  print("Export tile data")
+                  outputBytes(tiles)
+               # MAP movement
+               elif event.key == K_w:
+                  isomap.up(14 if shift else 2)
+                  info = None
+               elif event.key == K_a:
+                  isomap.left(6 if shift else 1)
+                  info = None
+               elif event.key == K_s:
+                  isomap.down(14 if shift else 2)
+                  info = None
+               elif event.key == K_d:
+                  isomap.right(6 if shift else 1)
+                  info = None
+
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
                currentTile = event.text
                canvas.set_image(tiles.get_surface(currentTile,0))
+            elif event.user_type == pygame_gui.UI_TEXT_ENTRY_FINISHED:
+               # should probably change to a RE
+               filter_list =  list(filter(lambda x: event.text.lower() in x.lower(), tiles.name_list()))
+               if len(filter_list) > 0:
+                  currentTile = filter_list[0]
+                  tileSelect.kill()
+                  tileSelect = pygame_gui.elements.ui_drop_down_menu.UIDropDownMenu(options_list=filter_list,
+                                                                     starting_option=currentTile,
+                                                                     relative_rect=pygame.Rect((100,0),(200,22)),
+                                                                     manager=manager,
+                                                                     expansion_height_limit=125)
+                  canvas.set_image(tiles.get_surface(currentTile,0))
+
 
          manager.process_events(event)
 
