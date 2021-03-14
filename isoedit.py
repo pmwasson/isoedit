@@ -219,8 +219,8 @@ class Map:
       self.offsetx = offsetx
       self.offsety = offsety
 
-      self.sizew = 128
-      self.sizeh = 128
+      self.sizew = 64
+      self.sizeh = 32
       self.posx = 0
       self.posy = 0
 
