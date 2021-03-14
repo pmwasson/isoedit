@@ -100,3 +100,4 @@
 #define TILE_wallSdirt                 133 // 0x11468 frames  1
 #define TILE_wallSgrid                 134 // 0x1167c frames  1
 #define TILE_wallSstone                135 // 0x11890 frames  1
+#define MAP_START                 0x011aa4

@@ -334,9 +334,7 @@ def outputBytes(tiles,filename='tiles'):
 
    tileNumber = 0
 
-   info = '#define {:25} 0x{:06x}'.format('TILE_START',len(outputBytes))
-   print(info)
-   outputInfo.append(info)
+   outputInfo.append('#define {:25} 0x{:06x}'.format('TILE_START',len(outputBytes)))
 
    outputBytes.append(0);  # upper byte
    outputBytes.append(WIDTH);
@@ -345,9 +343,7 @@ def outputBytes(tiles,filename='tiles'):
 
    for t in tiles.name_list():
       framecount = tiles.get_frame_count(t)
-      info = '#define {:30} {:3} // 0x{:04x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount)
-      print(info)
-      outputInfo.append(info)
+      outputInfo.append('#define {:30} {:3} // 0x{:04x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount))
       tileNumber = tileNumber + framecount
 
       for f in range(framecount):
@@ -363,6 +359,15 @@ def outputBytes(tiles,filename='tiles'):
                   maskByte =  maskByte  | (mask <<bitPos)
                outputBytes.append(colorByte)
                outputBytes.append(maskByte)
+
+   outputInfo.append('#define {:25} 0x{:06x}'.format('MAP_START',len(outputBytes)))
+
+   # fake map data
+   outputBytes.append(0x1)
+   outputBytes.append(0x2)
+   outputBytes.append(0x3)
+   outputBytes.append(0x4)
+
    with open(binFilename, "wb") as binary_file:
       byteCount = binary_file.write(outputBytes)
       print("Wrote {} bytes to {}".format(byteCount,binFilename))
