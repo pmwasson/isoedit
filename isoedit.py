@@ -319,15 +319,75 @@ class Map:
       if (self.posx + self.width > self.sizew):
          self.posx = self.sizew - self.width
 
+   def output(self,x,y,frameMap):
+      out = []
+      t = self.data[x][y].split(',')
+      # bg frame
+      out.append(frameMap[t[0]])
+      # fg frame
+      if (len(t) > 1):
+         out.append(frameMap[t[1]])
+      else:
+         out.append(0)
+      # movement flags
+      out.append(0xff)
+      # control flags
+      out.append(0xff)
+      # index
+      out.append(0)
+      return(out)
+
+   def save(self,mapFilename='map.txt'):
+      output = []
+      defines = {}
+
+      for y in range(self.sizeh):
+         outline = []
+         for x in range(self.sizew):
+            cell = self.data[x][y]
+            if cell not in defines:
+               defines[cell] = '{:02}'.format(len(defines))
+            outline.append(defines[cell])
+         output.append(';'.join(outline))
+
+      with open(mapFilename, "w") as text_file:
+         byteCount = 0
+         for d in defines:
+            byteCount += text_file.write('{}={}\n'.format(defines[d],d))
+         byteCount += text_file.write('\n'.join(output))
+         print("Wrote {} bytes to {}".format(byteCount,mapFilename))
+
+   def load(self,mapFilename='map.txt'):
+      defines = {}
+      y = 0
+
+      with open(mapFilename, "r") as text_file:
+
+         for l in text_file.readlines():
+            line = l.strip()
+            if '=' in line:
+               (name,value) = line.split('=')
+               defines[name] = value
+            else:
+               x = 0
+               for cell in line.split(';'):
+                  self.data[x][y] = defines[cell]
+                  x += 1
+               y+=1
+
+         print("Read {} rows from {}".format(y,mapFilename))
+
 # return 1-bit color and mask
 def colorTo1Bit(color):
    brightness = (0.21 * color[0]) + (0.72 * color[1]) + (0.07 * color[2])
    return(brightness > 128, color[3] > 200)
 
-def outputBytes(tiles,filename='tiles'):
+def outputBytes(tiles,isomap,filename='data'):
 
    binFilename = filename+".bin"
-   infoFilename = filename+".txt"
+   infoFilename = filename+".h"
+
+   frameMap= {}
 
    outputInfo = []
    outputBytes = bytearray();
@@ -343,7 +403,12 @@ def outputBytes(tiles,filename='tiles'):
 
    for t in tiles.name_list():
       framecount = tiles.get_frame_count(t)
-      outputInfo.append('#define {:30} {:3} // 0x{:04x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount))
+      outputInfo.append('#define {:30} {:3} // 0x{:06x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount))
+
+      # remember frame mapping
+      frameMap[t] = tileNumber 
+
+      # calc next tile
       tileNumber = tileNumber + framecount
 
       for f in range(framecount):
@@ -362,11 +427,12 @@ def outputBytes(tiles,filename='tiles'):
 
    outputInfo.append('#define {:25} 0x{:06x}'.format('MAP_START',len(outputBytes)))
 
-   # fake map data
-   outputBytes.append(0x1)
-   outputBytes.append(0x2)
-   outputBytes.append(0x3)
-   outputBytes.append(0x4)
+   for y in range(isomap.sizeh):
+      for x in range(isomap.sizew):
+         for b in isomap.output(x,y,frameMap):
+            outputBytes.append(b)
+
+   outputInfo.append('// Total bytes = {} (0x{:06x})'.format(len(outputBytes),len(outputBytes)))
 
    with open(binFilename, "wb") as binary_file:
       byteCount = binary_file.write(outputBytes)
@@ -479,7 +545,7 @@ def main():
                if event.key == K_x:
                   # export
                   print("Export tile data")
-                  outputBytes(tiles)
+                  outputBytes(tiles,isomap)
                # MAP movement
                elif event.key == K_w:
                   isomap.up(14 if shift else 2)
@@ -493,6 +559,12 @@ def main():
                elif event.key == K_d:
                   isomap.right(6 if shift else 1)
                   info = None
+               elif event.key == K_o:
+                  # Output
+                  isomap.save()
+               elif event.key == K_i:
+                  # Input
+                  isomap.load()
 
          if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
