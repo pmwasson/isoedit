@@ -319,22 +319,60 @@ class Map:
       if (self.posx + self.width > self.sizew):
          self.posx = self.sizew - self.width
 
-   def output(self,x,y,frameMap):
-      out = []
-      t = self.data[x][y].split(',')
-      # bg frame
-      out.append(frameMap[t[0]])
-      # fg frame
-      if (len(t) > 1):
-         out.append(frameMap[t[1]])
+   def tileType(self,data):
+      t = data.split(',')
+      if len(t) == 1:
+         if (t[0].startswith('block') or
+             t[0].startswith('deco') or
+             t[0].startswith('wall') or
+             t[0].startswith('ramp')):
+            return('blocked')
+         elif t[0].startswith('ground'):
+            return('free')
+         else:
+            return('unknown')
       else:
-         out.append(0)
-      # movement flags
-      out.append(0xff)
-      # control flags
-      out.append(0xff)
-      # index
-      out.append(0)
+         if t[1].startswith('obj'):
+            return('common_'+t[1])
+         if t[1].startswith('character'):
+            return('unique')
+         else:
+            return('unknown')
+
+   def output(self,frameMap):
+      out = []
+      prop = {}
+      propCount = 0
+
+      for y in range(self.sizeh):
+         for x in range(self.sizew):
+
+            t = self.data[x][y].split(',')
+            # bg frame
+            out.append(frameMap[t[0]])
+            # fg frame
+            if (len(t) > 1):
+               out.append(frameMap[t[1]])
+            else:
+               out.append(0)
+            # index
+            tile = self.tileType(self.data[x][y])
+            assert tile != 'unknown', 'Unknown tile type {} at {},{}'.format(self.data[x][y],x,y)
+            index = 0
+            if tile == 'unique':
+               index = propCount
+               propCount += 1
+               print('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
+            elif tile in prop:
+               index = prop[tile]
+            else:
+               index = propCount
+               prop[tile] = index
+               propCount += 1
+               print('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
+
+            out.append(index)
+
       return(out)
 
    def save(self,mapFilename='map.txt'):
@@ -346,7 +384,7 @@ class Map:
          for x in range(self.sizew):
             cell = self.data[x][y]
             if cell not in defines:
-               defines[cell] = '{:02}'.format(len(defines))
+               defines[cell] = '{:02x}'.format(len(defines))
             outline.append(defines[cell])
          output.append(';'.join(outline))
 
@@ -403,7 +441,7 @@ def outputBytes(tiles,isomap,filename='data'):
 
    for t in tiles.name_list():
       framecount = tiles.get_frame_count(t)
-      outputInfo.append('#define {:30} {:3} // 0x{:06x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount))
+      outputInfo.append('#define {:30} 0x{:02x} // 0x{:06x} frames {:2}'.format('TILE_'+t,tileNumber,len(outputBytes),framecount))
 
       # remember frame mapping
       frameMap[t] = tileNumber 
@@ -427,10 +465,8 @@ def outputBytes(tiles,isomap,filename='data'):
 
    outputInfo.append('#define {:25} 0x{:06x}'.format('MAP_START',len(outputBytes)))
 
-   for y in range(isomap.sizeh):
-      for x in range(isomap.sizew):
-         for b in isomap.output(x,y,frameMap):
-            outputBytes.append(b)
+   for b in isomap.output(frameMap):
+      outputBytes.append(b)
 
    outputInfo.append('// Total bytes = {} (0x{:06x})'.format(len(outputBytes),len(outputBytes)))
 
