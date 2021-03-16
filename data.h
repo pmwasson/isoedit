@@ -101,4 +101,10 @@
 #define TILE_wallSgrid                 0x86 // 0x01167c frames  1
 #define TILE_wallSstone                0x87 // 0x011890 frames  1
 #define MAP_START                 0x011aa4
+// prop free = 0 // groundGrass0
+// prop blocked = 1 // decoTreePine
+// prop common_objCloud = 2 // groundGrass0,objCloud
+// prop common_objMailbox_s0 = 3 // groundGrass1,objMailbox_s0
+// prop common_objSignR = 4 // groundGrass0,objSignR
+// prop unique = 5 // groundGrass0,characterWitch
 // Total bytes = 78500 (0x0132a4)

@@ -341,6 +341,7 @@ class Map:
 
    def output(self,frameMap):
       out = []
+      info = []
       prop = {}
       propCount = 0
 
@@ -362,18 +363,18 @@ class Map:
             if tile == 'unique':
                index = propCount
                propCount += 1
-               print('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
+               info.append('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
             elif tile in prop:
                index = prop[tile]
             else:
                index = propCount
                prop[tile] = index
                propCount += 1
-               print('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
+               info.append('// prop {} = {} // {}'.format(tile,index,self.data[x][y]))
 
             out.append(index)
 
-      return(out)
+      return(out,info)
 
    def save(self,mapFilename='map.txt'):
       output = []
@@ -465,8 +466,12 @@ def outputBytes(tiles,isomap,filename='data'):
 
    outputInfo.append('#define {:25} 0x{:06x}'.format('MAP_START',len(outputBytes)))
 
-   for b in isomap.output(frameMap):
+   (mapBytes,mapInfo) =  isomap.output(frameMap)
+
+   for b in mapBytes:
       outputBytes.append(b)
+
+   outputInfo += mapInfo
 
    outputInfo.append('// Total bytes = {} (0x{:06x})'.format(len(outputBytes),len(outputBytes)))
 
