@@ -101,6 +101,9 @@
 #define TILE_wallSgrid                 0x86 // 0x01167c frames  1
 #define TILE_wallSstone                0x87 // 0x011890 frames  1
 #define MAP_START                 0x011aa4
+#define MAP_WIDTH     64
+#define MAP_HEIGHT    32
+#define MAP_TILE_SIZE 3
 // prop free = 0 // groundGrass0
 // prop blocked = 1 // decoTreePine
 // prop common_objCloud = 2 // groundGrass0,objCloud

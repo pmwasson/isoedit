@@ -345,6 +345,10 @@ class Map:
       prop = {}
       propCount = 0
 
+      info.append("#define MAP_WIDTH     {}".format(self.sizew))
+      info.append("#define MAP_HEIGHT    {}".format(self.sizeh))
+      info.append("#define MAP_TILE_SIZE {}".format(3))
+      
       for y in range(self.sizeh):
          for x in range(self.sizew):
 
