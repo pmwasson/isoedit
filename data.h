@@ -112,3 +112,4 @@
 // prop common_objSignR = 4 // groundGrass0,objSignR
 // prop unique = 5 // groundGrass0,characterWitch
 // Total bytes = 82224 (0x014130)
+#define FX_DATA_PAGE              0x00febe

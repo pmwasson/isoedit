@@ -478,6 +478,7 @@ def outputBytes(tiles,isomap,filename='data'):
    outputInfo += mapInfo
 
    outputInfo.append('// Total bytes = {} (0x{:06x})'.format(len(outputBytes),len(outputBytes)))
+   outputInfo.append('#define {:25} 0x{:06x}'.format('FX_DATA_PAGE',0x10000 - (len(outputBytes)+255)//256))
 
    with open(binFilename, "wb") as binary_file:
       byteCount = binary_file.write(outputBytes)
